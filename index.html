@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fundtop</title>
+<meta name="description" content="A weekly leaderboard where fans fund open source. 90% goes to maintainers, after card fees.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230b0e0c'/%3E%3Crect x='5' y='3' width='6' height='10' fill='%2367d6f7'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Martian+Mono:wdth,wght@75..112.5,100..800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ground: #0b0e0c;
+    --pane: #131915;
+    --pane-deep: #0d110f;
+    --edge: #232b26;
+    --line: #1b221e;
+    --fg: #dfe5dc;
+    --dim: #8f9a8e;
+    --ink: #0b0e0c;
+    /* ANSI roles, each with exactly one meaning */
+    --money: #6fe07f;   /* money in */
+    --select: #67d6f7;  /* selection, navigation */
+    --time: #f5cf5a;    /* time */
+    --loss: #ff6e62;    /* rank lost */
+    --mono: "Martian Mono", ui-monospace, monospace;
+    --sans: "Archivo", system-ui, sans-serif;
+    --ease: cubic-bezier(.16, 1, .3, 1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--ground); color-scheme: dark; scrollbar-color: var(--edge) var(--ground); }
+  body { background: var(--ground); color: var(--fg); font: 400 17px/1.55 var(--sans); caret-color: var(--select); -webkit-font-smoothing: antialiased; }
+  ::selection { background: var(--select); color: var(--ink); }
+  a { color: inherit; text-decoration: none; }
+  :focus-visible { outline: 2px solid var(--select); outline-offset: 3px; border-radius: 4px; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding-inline: 32px; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .m { color: var(--money); }
+
+  /* Top bar */
+  .bar { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-block: 20px; }
+  .mark { font: 700 19px/1 var(--mono); font-variation-settings: "wdth" 100; letter-spacing: -0.02em; display: inline-flex; align-items: center; gap: 2px; }
+  .mark::after { content: ""; width: 0.55em; height: 1.05em; background: var(--select); margin-left: 3px; }
+  .tag { font: 400 13.5px/1 var(--mono); font-variation-settings: "wdth" 87.5; color: var(--dim); white-space: nowrap; }
+
+  /* Hero: headline beside the deal */
+  .hero { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 56px; align-items: end; padding-block: 16px 30px; }
+  h1 { font: 800 clamp(34px, 3.6vw, 52px)/1.04 var(--sans); font-variation-settings: "wdth" 122; letter-spacing: -0.025em; text-wrap: balance; }
+  .deal { display: grid; gap: 18px; }
+  .receipt { font: 400 13.5px/1.75 var(--mono); font-variation-settings: "wdth" 87.5; font-variant-numeric: tabular-nums; }
+  .receipt p.rh { display: block; color: var(--dim); margin-bottom: 2px; }
+  .receipt p { display: grid; grid-template-columns: 7ch 1fr; gap: 10px; }
+  .receipt p:not(.rh) span:first-child { text-align: right; font-weight: 700; }
+  .receipt p.rest { color: var(--dim); }
+  .acts { display: flex; flex-wrap: wrap; gap: 10px; }
+  .btn { display: inline-flex; align-items: center; font: 600 15px/1 var(--sans); padding: 13px 16px; border-radius: 6px; cursor: pointer; transition: background-color .2s var(--ease), border-color .2s var(--ease); }
+  .btn.go { background: var(--money); color: var(--ink); }
+  .btn.go:hover { background: #8aeb97; }
+  .btn.alt { border: 1px solid var(--edge); color: var(--fg); }
+  .btn.alt:hover { border-color: var(--dim); background: #18201b; }
+
+  /* Terminal pane */
+  .pane { background: var(--pane); border: 1px solid var(--edge); border-radius: 6px; overflow: hidden; font: 400 13.5px/1.6 var(--mono); font-variation-settings: "wdth" 87.5; font-variant-numeric: tabular-nums; }
+  .strip { display: flex; justify-content: space-between; gap: 16px; white-space: nowrap; padding: 8px 22px; background: var(--pane-deep); border-bottom: 1px solid var(--line); color: var(--dim); }
+  .meters { display: grid; grid-template-columns: 1.7fr 1fr; gap: 40px; padding: 18px 26px 16px; }
+  .rivals { display: grid; grid-template-columns: max-content 1fr max-content max-content; align-items: center; column-gap: 16px; row-gap: 8px; }
+  .rivals .who { font-size: 19px; font-weight: 700; font-variation-settings: "wdth" 100; }
+  .rivals .amt { font-size: 19px; font-weight: 700; font-variation-settings: "wdth" 100; text-align: right; min-width: 6ch; }
+  .rivals .bk { color: var(--dim); text-align: right; }
+  .rivals .lead { grid-column: 1 / -1; color: var(--dim); }
+  .rivals .lead b { color: var(--fg); }
+  .meter { display: flex; align-items: center; gap: 6px; color: var(--dim); }
+  .meter .track { flex: 1; height: 24px; position: relative; background: repeating-linear-gradient(90deg, #1f2823 0 3px, transparent 3px 8px); }
+  .meter .fill { position: absolute; inset: 0 auto 0 0; width: var(--pct); background: repeating-linear-gradient(90deg, var(--money) 0 3px, transparent 3px 8px); transition: width .7s var(--ease); }
+  .meter.sm .track { height: 13px; background: repeating-linear-gradient(90deg, #1f2823 0 2px, transparent 2px 6px); }
+  .meter.sm .fill { background: repeating-linear-gradient(90deg, var(--time) 0 2px, transparent 2px 6px); }
+  .statcol { display: flex; flex-direction: column; justify-content: center; gap: 12px; }
+  .stats { display: grid; grid-template-columns: max-content 1fr max-content 1fr; column-gap: 12px; row-gap: 6px; }
+  .stats dt { color: var(--dim); }
+  .stats dd { font-weight: 700; }
+  .wk { display: grid; grid-template-columns: max-content 1fr max-content; gap: 10px; align-items: center; }
+  .wk .t { color: var(--time); font-weight: 700; }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead th { background: var(--money); color: var(--ink); font-weight: 700; text-align: left; padding: 3px 10px; white-space: nowrap; }
+  thead th:first-child, tbody td:first-child { padding-left: 26px; }
+  thead th:last-child, tbody td:last-child { padding-right: 26px; }
+  th.n, td.n { text-align: right; }
+  thead th.sort { background: var(--select); }
+  tbody td { padding: 4px 10px; white-space: nowrap; }
+  tbody tr { transition: background-color .9s var(--ease); }
+  tbody tr:hover { background: #18201b; }
+  tbody tr.top { background: var(--select); color: var(--ink); }
+  tbody tr.top td { font-weight: 700; }
+  tbody tr.top .own, tbody tr.top .lang { color: var(--ink); }
+  tbody tr.hit { background: rgba(111, 224, 127, .28); transition: none; }
+  tbody tr.top.hit { background: var(--money); }
+  .own, .lang { color: var(--dim); }
+  .up { font-weight: 700; }
+  .down { color: var(--loss); }
+  tr.top .down { color: var(--ink); }
+
+  .log { border-top: 1px solid var(--line); margin-top: 8px; padding: 10px 26px 12px; min-height: 98px; }
+  .log .cmd { color: var(--dim); margin-bottom: 2px; }
+  .log p { display: grid; grid-template-columns: 9ch 6ch 28ch 1fr; gap: 12px; }
+  .log p.new { animation: line-in .5s var(--ease); }
+  .log .ts, .log .by { color: var(--dim); }
+  .log .m { font-weight: 700; }
+  @keyframes line-in { from { opacity: 0; transform: translateY(6px); } }
+
+  .keys { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 8px 22px; background: var(--pane-deep); border-top: 1px solid var(--line); }
+  .keys a { display: inline-flex; align-items: center; cursor: pointer; }
+  .keys b { padding-right: 3px; }
+  .keys a span { background: var(--select); color: var(--ink); padding: 0 8px 0 4px; transition: filter .2s var(--ease); }
+  .keys a:hover span { filter: brightness(1.15); }
+  .keys a.go span { background: var(--money); font-weight: 700; }
+  .keys .status { margin-left: auto; color: var(--fg); }
+
+  /* Help screen */
+  .help { padding-block: 88px 24px; }
+  h2 { font: 800 clamp(30px, 3.4vw, 44px)/1.05 var(--sans); font-variation-settings: "wdth" 122; letter-spacing: -0.02em; margin-bottom: 22px; }
+  .entry { display: grid; grid-template-columns: 220px minmax(0, 68ch); gap: 32px; padding: 20px 0; border-top: 1px solid var(--line); }
+  .entry:last-child { border-bottom: 1px solid var(--line); }
+  .entry h3 { font: 700 13px/1.9 var(--mono); letter-spacing: .04em; text-transform: uppercase; }
+  .entry p + p, .entry .receipt + p { margin-top: 10px; }
+  .entry .receipt p + p { margin-top: 0; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 22px; font: 400 13.5px/1.6 var(--mono); font-variation-settings: "wdth" 87.5; }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .legend i { width: 14px; height: 14px; display: inline-block; }
+
+  /* Close */
+  .close { display: flex; justify-content: space-between; align-items: end; gap: 32px; flex-wrap: wrap; padding-block: 80px 96px; }
+  .close h2 { margin: 0 0 10px; }
+  .close p { font: 400 13.5px/1.7 var(--mono); font-variation-settings: "wdth" 87.5; color: var(--dim); }
+  .close p .t { color: var(--time); font-weight: 700; }
+  .close p b { color: var(--fg); }
+  footer { padding-block: 0 40px; }
+  .foot { border-top: 1px solid var(--line); padding-top: 24px; color: var(--dim); font-size: 14px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: 1fr; gap: 22px; }
+    .meters { grid-template-columns: 1fr; gap: 18px; }
+    .entry { grid-template-columns: 1fr; gap: 6px; }
+  }
+  @media (max-width: 640px) {
+    .wrap { padding-inline: 16px; }
+    .tag { font-size: 12px; }
+    .pane { font-size: 12px; border-radius: 4px; }
+    .strip, .keys { padding-left: 14px; padding-right: 14px; }
+    .meters { padding: 14px; }
+    .rivals { grid-template-columns: max-content 1fr max-content; column-gap: 10px; }
+    .rivals .bk { display: none; }
+    .rivals .who, .rivals .amt { font-size: 14px; }
+    .meter .track { height: 18px; }
+    .c-lang, .c-maint, .c-pot, .c-back, .c-wide { display: none; }
+    thead th:first-child, tbody td:first-child { padding-left: 14px; }
+    thead th:last-child, tbody td:last-child { padding-right: 14px; }
+    tbody td, thead th { padding-left: 6px; padding-right: 6px; }
+    .log { padding: 10px 14px; }
+    .log p { grid-template-columns: 8.5ch 4.5ch 1fr; gap: 8px; }
+    .log .by { display: none; }
+    .keys { gap: 6px 9px; }
+    .keys a { min-height: 32px; }
+    .keys a span { padding: 0 5px 0 3px; }
+    .keys .status { flex-basis: 100%; margin-left: 0; }
+    .keys .status:empty { display: none; }
+    .help { padding-top: 72px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<header class="wrap bar">
+  <a class="mark" href="#" aria-label="fundtop home">fundtop</a>
+  <span class="tag">[preview · sample numbers]</span>
+</header>
+
+<main>
+  <section class="wrap hero">
+    <h1>The top of open source.</h1>
+    <div class="deal">
+      <div class="receipt" aria-label="Where a $5 backing goes">
+        <p class="rh">Every $5 backing splits like this:</p>
+        <p><span class="m">$4.10</span><span>to the project's maintainers</span></p>
+        <p class="rest"><span>$0.44</span><span>card fees</span></p>
+        <p class="rest"><span>$0.46</span><span>fundtop</span></p>
+      </div>
+      <div class="acts">
+        <a class="btn go" href="#board" data-back>Back a project · $5</a>
+        <a class="btn alt" href="#maintainers">Claim or remove your project</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap" id="board" aria-label="This week's leaderboard">
+    <div class="pane">
+      <div class="strip"><span>fundtop<span class="c-wide"> · resets Monday 00:00 UTC</span></span><span><span class="c-wide">sorted by RAISED · </span>sample numbers</span></div>
+
+      <div class="meters">
+        <div class="rivals" id="rivals"></div>
+        <div class="statcol">
+          <dl class="stats">
+            <dt>Projects</dt><dd>254</dd>
+            <dt>Backers</dt><dd id="s-backers"></dd>
+            <dt>Pot</dt><dd class="m" id="s-pot"></dd>
+            <dt>To maint.</dt><dd class="m" id="s-maint"></dd>
+          </dl>
+          <div class="wk">
+            <span>week <span class="wk-no"></span></span>
+            <span class="meter sm"><span>[</span><span class="track"><span class="fill" id="wk-fill"></span></span><span>]</span></span>
+            <span class="t" id="wk-left"></span>
+          </div>
+        </div>
+      </div>
+
+      <table>
+        <caption class="sr">Sample leaderboard. Project names and numbers are made up.</caption>
+        <thead><tr><th class="n">RANK</th><th>Δ</th><th>PROJECT</th><th class="c-lang">LANG</th><th class="n c-back">BACKERS</th><th class="n sort">RAISED</th><th class="n c-maint">TO MAINT.</th><th class="n c-pot">%POT</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+
+      <div class="log" aria-live="off">
+        <div class="cmd">$ tail -f backings<span class="c-wide">  (UTC)</span></div>
+        <div id="lines"></div>
+      </div>
+
+      <nav class="keys" aria-label="Board actions">
+        <a href="#help"><b>F1</b><span>Help</span></a>
+        <a class="go" href="#board" data-back><b>F5</b><span>Back $5</span></a>
+        <a href="#payouts"><b>F9</b><span>Payouts</span></a>
+        <a href="#maintainers"><b>F10</b><span>Claim</span></a>
+        <span class="status" id="status" role="status"></span>
+      </nav>
+    </div>
+  </section>
+
+  <section class="wrap help" id="help">
+    <h2>How the board works</h2>
+    <div class="entry"><h3>Colors</h3><div class="legend">
+      <span><i style="background:var(--money)"></i>money in</span>
+      <span><i style="background:var(--select)"></i>selected row, actions</span>
+      <span><i style="background:var(--time)"></i>time left</span>
+      <span><i style="background:var(--loss)"></i>rank lost</span>
+    </div></div>
+    <div class="entry"><h3>The week</h3><div><p>Back any listed project with $5 or more. The biggest total at Monday 00:00 UTC takes #1, then the board resets for the next week.</p></div></div>
+    <div class="entry" id="payouts"><h3>Your $5</h3><div>
+      <div class="receipt">
+        <p><span class="m">$4.10</span><span>to the project's maintainers (90% after card fees)</span></p>
+        <p class="rest"><span>$0.44</span><span>card fees</span></p>
+        <p class="rest"><span>$0.46</span><span>fundtop</span></p>
+      </div>
+      <p>Every payout is public: who got paid, how much, and when.</p>
+    </div></div>
+    <div class="entry" id="maintainers"><h3>Maintainers</h3><div><p>At launch, open-source projects with a GitHub Sponsors or Open Collective page will be on the board. Claim yours to send payouts to your Sponsors page, or ask us to leave it off.</p><p>Being listed never means a project endorses fundtop.</p></div></div>
+  </section>
+
+  <section class="wrap close">
+    <div>
+      <h2>Board resets Monday, 00:00 UTC.</h2>
+      <p><span class="t" id="close-left"></span> left · <span id="close-lead"></span></p>
+    </div>
+    <a class="btn go" href="#board" data-back>Back a project · $5</a>
+  </section>
+</main>
+
+<footer class="wrap">
+  <div class="foot">
+    <span>fundtop is in preview. Project names and numbers are samples.</span>
+    <span>Payments open at launch.</span>
+  </div>
+</footer>
+
+<script>
+  // Sample data only. y = rank last week.
+  const projects = [
+    { id: "your-org/your-project",    lang: "TypeScript", backers: 412, raised: 2140, y: 2 },
+    { id: "sample/terminal",          lang: "Rust",       backers: 298, raised: 1610, y: 1 },
+    { id: "their-org/their-project",  lang: "TypeScript", backers: 261, raised: 1365, y: 6 },
+    { id: "sample/editor",            lang: "Rust",       backers: 230, raised: 1190, y: 4 },
+    { id: "sample/notes",             lang: "Clojure",    backers: 184, raised: 905,  y: 3 },
+    { id: "sample/state-machine",     lang: "TypeScript", backers: 151, raised: 760,  y: 5 },
+    { id: "sample/http-client",       lang: "Rust",       backers: 122, raised: 590,  y: 8 },
+    { id: "sample/static-site",       lang: "TypeScript", backers: 97,  raised: 455,  y: 7 },
+  ];
+  const rivals = ["your-org/your-project", "their-org/their-project"];
+  const others = { backers: 459, raised: 2465 }; // the rest of the sample board
+  const usd = n => "$" + Math.round(n).toLocaleString("en-US");
+  // 90% after card fees (2.9% + 30¢ per payment)
+  const toMaint = (raised, backers) => (raised - raised * 0.029 - backers * 0.30) * 0.9;
+  const pad = n => String(n).padStart(2, "0");
+  const clock = d => `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+  const short = id => id.split("/")[1];
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let backerNo = projects.reduce((s, p) => s + p.backers, others.backers);
+
+  function isoWeek(d) {
+    const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+    return Math.ceil(((t - Date.UTC(t.getUTCFullYear(), 0, 1)) / 864e5 + 1) / 7);
+  }
+
+  function render(hitId) {
+    projects.sort((a, b) => b.raised - a.raised);
+    const pot = projects.reduce((s, p) => s + p.raised, others.raised);
+    const backers = projects.reduce((s, p) => s + p.backers, others.backers);
+    document.getElementById("rows").innerHTML = projects.map((p, i) => {
+      const d = p.y - (i + 1);
+      const [own, name] = p.id.split("/");
+      const delta = d > 0 ? `<span class="up">+${d}</span>` : d < 0 ? `<span class="down">−${-d}</span>` : "";
+      return `<tr class="${i === 0 ? "top" : ""}${p.id === hitId ? " hit" : ""}">
+        <td class="n">${i + 1}</td><td>${delta}</td>
+        <td><span class="own">${own}/</span>${name}</td><td class="lang c-lang">${p.lang}</td>
+        <td class="n c-back">${p.backers}</td><td class="n">${usd(p.raised)}</td>
+        <td class="n c-maint">${usd(toMaint(p.raised, p.backers))}</td><td class="n c-pot">${(p.raised / pot * 100).toFixed(1)}</td></tr>`;
+    }).join("");
+    const [a, b] = rivals.map(id => projects.find(p => p.id === id));
+    const [lead, trail] = a.raised >= b.raised ? [a, b] : [b, a];
+    const leadText = `<b>${short(lead.id)}</b> leads <b>${short(trail.id)}</b> by <b>${usd(lead.raised - trail.raised)}</b>`;
+    document.getElementById("rivals").innerHTML = [a, b].map(p => `
+      <span class="who">${short(p.id)}</span>
+      <span class="meter"><span>[</span><span class="track"><span class="fill" style="--pct:${(p.raised / (a.raised + b.raised) * 100).toFixed(1)}%"></span></span><span>]</span></span>
+      <span class="amt">${usd(p.raised)}</span><span class="bk">${p.backers} backers</span>`).join("")
+      + `<p class="lead">${leadText}</p>`;
+    document.getElementById("close-lead").innerHTML = leadText;
+    document.getElementById("s-backers").textContent = backers.toLocaleString("en-US");
+    document.getElementById("s-pot").textContent = usd(pot);
+    document.getElementById("s-maint").textContent = usd(toMaint(pot, backers));
+    if (hitId) requestAnimationFrame(() => requestAnimationFrame(() =>
+      document.querySelector("tr.hit")?.classList.remove("hit")));
+  }
+
+  function addLine(time, amount, id, no, fresh) {
+    const lines = document.getElementById("lines");
+    const p = document.createElement("p");
+    if (fresh) p.className = "new";
+    p.innerHTML = `<span class="ts">${clock(time)}</span><span class="m">+$${amount}</span><span>${id}</span><span class="by">backer #${no.toLocaleString("en-US")}</span>`;
+    lines.append(p);
+    while (lines.children.length > 3) lines.firstElementChild.remove();
+  }
+
+  function tickWeek() {
+    const now = new Date();
+    const next = new Date(now);
+    next.setUTCHours(0, 0, 0, 0);
+    next.setUTCDate(next.getUTCDate() + ((8 - next.getUTCDay()) % 7 || 7));
+    const left = next - now, week = 7 * 864e5;
+    const s = Math.floor(left / 1000);
+    const txt = `${Math.floor(s / 86400)}d ${pad(Math.floor(s / 3600) % 24)}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`;
+    document.getElementById("wk-left").textContent = txt + " left";
+    document.getElementById("close-left").textContent = txt;
+    document.getElementById("wk-fill").style.setProperty("--pct", ((1 - left / week) * 100).toFixed(1) + "%");
+  }
+
+  // Payments aren't live in this preview: say so where the board can be seen.
+  let statusTimer;
+  function back(e) {
+    e?.preventDefault();
+    document.getElementById("board").scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "nearest" });
+    const status = document.getElementById("status");
+    status.textContent = "Payments open at launch. This is a preview.";
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(() => (status.textContent = ""), 4000);
+  }
+  document.querySelectorAll("[data-back]").forEach(el => el.addEventListener("click", back));
+
+  // The F-key bar works from the keyboard, like htop.
+  const keys = { F1: "#help", F9: "#payouts", F10: "#maintainers" };
+  addEventListener("keydown", e => {
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    if (e.key === "F5") back(e);
+    else if (keys[e.key]) { e.preventDefault(); location.hash = keys[e.key]; }
+  });
+
+  document.querySelectorAll(".wk-no").forEach(el => (el.textContent = isoWeek(new Date())));
+  const now = Date.now();
+  [["sample/editor", 5, 23], ["their-org/their-project", 10, 5], ["your-org/your-project", 5, 0]]
+    .forEach(([id, amt, ago], i) => addLine(new Date(now - ago * 1000), amt, id, backerNo - 2 + i, false));
+  render();
+  tickWeek();
+  setInterval(tickWeek, 1000);
+
+  // The board refreshes like htop: a new backing lands, its row flashes, the table re-sorts.
+  if (!location.search.includes("still")) {
+    const amounts = [5, 5, 5, 5, 10, 10, 20, 50];
+    setTimeout(function backing() {
+      const p = projects[Math.floor(Math.random() ** 1.6 * projects.length)];
+      const amt = amounts[Math.floor(Math.random() * amounts.length)];
+      p.raised += amt; p.backers += 1; backerNo += 1;
+      render(p.id);
+      addLine(new Date(), amt, p.id, backerNo, true);
+      setTimeout(backing, 1800 + Math.random() * 2600);
+    }, 3500);
+  }
+</script>
+</body>
+</html>
