@@ -188,7 +188,7 @@
         <p class="rest"><span>10%</span><span>fundtop</span></p>
       </div>
       <div class="acts">
-        <a class="btn go" href="#board" data-back>Back a project for $5</a>
+        <a class="btn go" href="#board" data-back>Back a project</a>
         <a class="btn alt" href="#maintainers">Claim or remove your project</a>
       </div>
     </div>
@@ -228,7 +228,7 @@
 
       <nav class="keys" aria-label="Board actions">
         <a href="#help"><b>F1</b><span>Help</span></a>
-        <a class="go" href="#board" data-back><b>F5</b><span>Back $5</span></a>
+        <a class="go" href="#board" data-back><b>F5</b><span>Back</span></a>
         <a href="#payouts"><b>F9</b><span>Payouts</span></a>
         <a href="#maintainers"><b>F10</b><span>Claim</span></a>
         <span class="status" id="status" role="status"></span>
@@ -244,7 +244,7 @@
       <span><i style="background:var(--time)"></i>time left</span>
       <span><i style="background:var(--loss)"></i>rank lost</span>
     </div></div>
-    <div class="entry"><h3>The week</h3><div><p>Back any listed project with $5 or more. The biggest total at Monday 00:00 UTC takes #1, then the board resets for the next week.</p></div></div>
+    <div class="entry"><h3>The week</h3><div><p>Back any listed project with any amount. The biggest total at Monday 00:00 UTC takes #1, then the board resets for the next week.</p></div></div>
     <div class="entry" id="payouts"><h3>The money</h3><div>
       <div class="receipt">
         <p><span class="m">90%</span><span>to the project's maintainers</span></p>
@@ -260,7 +260,7 @@
       <h2>Board resets Monday, 00:00 UTC.</h2>
       <p><span class="t" id="close-left"></span> left, and <span id="close-lead"></span></p>
     </div>
-    <a class="btn go" href="#board" data-back>Back a project for $5</a>
+    <a class="btn go" href="#board" data-back>Back a project</a>
   </section>
 </main>
 
@@ -374,7 +374,7 @@
 
   document.querySelectorAll(".wk-no").forEach(el => (el.textContent = isoWeek(new Date())));
   const now = Date.now();
-  [["sample/editor", 5, 23], ["their-org/their-project", 10, 5], ["your-org/your-project", 5, 0]]
+  [["sample/editor", 3, 23], ["their-org/their-project", 10, 5], ["your-org/your-project", 5, 0]]
     .forEach(([id, amt, ago], i) => addLine(new Date(now - ago * 1000), amt, id, backerNo - 2 + i, false));
   render();
   tickWeek();
@@ -382,7 +382,7 @@
 
   // The board refreshes like htop: a new backing lands, its row flashes, the table re-sorts.
   if (!location.search.includes("still")) {
-    const amounts = [5, 5, 5, 5, 10, 10, 20, 50];
+    const amounts = [1, 2, 3, 5, 5, 10, 20, 50];
     setTimeout(function backing() {
       const p = projects[Math.floor(Math.random() ** 1.6 * projects.length)];
       const amt = amounts[Math.floor(Math.random() * amounts.length)];
